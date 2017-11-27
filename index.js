@@ -26,33 +26,46 @@ RiotApi.prototype.get = function() {
 
 /** RateLimits for a region. One app limit and any number of method limits. */
 function Region(config, redisClient) {
+	console.log("New region");
 	this.config = config;
+	this.appLimiters = [];
 	this.methodLimiters = {};
 	this.redisClient = redisClient;
-	let appLimit = this._getLimits(this.config.applimit);
-	this.appLimiter = limiter({
-		redis: this.redisClient,
-		namespace: process.env.NODE_ENV + 'app', // TODO maybe settable by user
-		interval: appLimit.interval,
-		maxInInterval: appLimit.maxRequests
-	});
+	let appLimit_1 = this._getLimits(this.config.applimit[0]);
+	this.appLimiters.push(
+		limiter({
+			redis: this.redisClient,
+			namespace: process.env.NODE_ENV + 'app_0', // TODO maybe settable by user
+			interval: appLimit_1.interval,
+			maxInInterval: appLimit_1.maxRequests,
+			minDifference: Math.ceil(appLimit_1.interval / appLimit_1.maxRequests * this.config.edgeCaseBuffer)
+		})
+	);
+	let appLimit_2 = this._getLimits(this.config.applimit[1]);
+	let minDiff = this.config.spreadToSlowest ? Math.ceil(appLimit_2.interval / appLimit_2.maxRequests * this.config.edgeCaseBuffer) : 0;
+	this.appLimiters.push(
+		limiter({
+			redis: this.redisClient,
+			namespace: process.env.NODE_ENV + 'app_1', // TODO maybe settable by user
+			interval: appLimit_2.interval,
+			maxInInterval: appLimit_2.maxRequests,
+			minDifference: minDiff
+		})
+	);
 	this.requestQueue = [];
 	this.isProcessing = false;
 }
 
 Region.prototype.get = function() {
-
-	console.log('starting get promise');
-
 	return new Promise((resolve, reject) => {
 		// TODO: Multiple Priorities with two queues
 		this.requestQueue.push({
 			arguments : arguments,
 			callback : res => {
-				resolve(res);
+				return resolve(res);
 			},
 			onError : err => {
-				reject(err);
+				return reject(err);
 			}
 		});
 
@@ -62,84 +75,108 @@ Region.prototype.get = function() {
 
 Region.prototype.processQueue = async(that) => {
 
-	while(that.requestQueue.length > 0 && !that.isProcessing){
-
-		that.isProcessing = true;
-		let queueItem = that.requestQueue.pop();
-
-		// Build URL
-		let prefix = util.format(that.config.prefix, queueItem.arguments[0]);
-		let target = queueItem.arguments[1];
-		let path = target.split('.')[1];
-		let suffix = that.config.endpoints;
-		for (let path of target.split('.'))
-		    suffix = suffix[path];
-		let endpoint = suffix.url;
-		// TODO check suffix catch
-		let qs = {};
-		let args = Array.prototype.slice.call(queueItem.arguments, 2);
-		if (typeof args[args.length - 1] === 'object') // If last obj is query string, pop it off.
-			qs = args.pop();
-		if (endpoint.split('%s').length - 1 !== args.length)
-			throw new Error(util.format('Wrong number of path arguments: "%j", for path "%s".', args, endpoint));
-		endpoint = util.format(endpoint, ...args);
-		let url = prefix + endpoint;
-
-		// Create methodlimiter, if not already created
-		if(that.methodLimiters[target] === undefined){
-			let methodlimit = that._getLimits(suffix.limit);
-			that.methodLimiters[target] = limiter({
-			  	redis: that.redisClient,
-			  	namespace: process.env.NODE_ENV + target, // TODO maybe settable by user
-				interval: methodlimit.interval,
-				maxInInterval: methodlimit.maxRequests
+	if(!this.isProcessing) {
+		this.isProcessing = true;
+		while(that.requestQueue.length > 0){
+			let queueItem = that.requestQueue.pop();
+	
+			// Build URL
+			let prefix = util.format(that.config.prefix, queueItem.arguments[0]);
+			let target = queueItem.arguments[1];
+			let path = target.split('.')[1];
+			let endpoint = that.config.endpoints;
+			for (let path of target.split('.'))
+				endpoint = endpoint[path];
+			if(endpoint === undefined) {
+				console.error("Api endpoint " + target + "not defined");
+				return queueItem.onError("Api endpoint " + target + " not defined");
+			}
+			let suffix = endpoint.url;
+			let qs = {};
+			let args = Array.prototype.slice.call(queueItem.arguments, 2);
+			if (typeof args[args.length - 1] === 'object') // If last obj is query string, pop it off.
+				qs = args.pop();
+			if (suffix.split('%s').length - 1 !== args.length)
+				throw new Error(util.format('Wrong number of path arguments: "%j", for path "%s".', args, suffix));
+			suffix = util.format(suffix, ...args);
+			let url = prefix + suffix;
+	
+			// Create methodlimiter, if not already created
+			if(that.methodLimiters[target] === undefined){
+				let methodlimit = that._getLimits(endpoint.limit);
+				that.methodLimiters[target] = limiter({
+					redis: that.redisClient,
+					namespace: process.env.NODE_ENV + target, // TODO maybe settable by user
+					interval: methodlimit.interval,
+					maxInInterval: methodlimit.maxRequests					
+				});
+				console.log("New method limiter");
+			}
+	
+			// Create app limit and method limit attempt promise
+			let attemptPromises = [];
+			let appTimeLeft = 0;
+			that.appLimiters.forEach(limiter => {
+				attemptPromises.push(
+					that._getAttemptPromise(limiter)
+					.then(time => {
+						if(time > appTimeLeft) appTimeLeft = time; 
+					})
+				);
+			});
+			let methodTimeLeft = 0;
+			attemptPromises.push(
+				that._getAttemptPromise(that.methodLimiters[target])
+				.then(time => methodTimeLeft = time)
+			);
+			await Promise.all(attemptPromises);
+			let timeLeft = appTimeLeft > methodTimeLeft ? appTimeLeft : methodTimeLeft;
+			if(timeLeft > 0) {
+				console.log("Snoozing for", timeLeft);
+				await snooze(timeLeft);
+			}
+	
+			// send request to riot
+			var options = {
+					uri: url,
+					method: 'GET',
+					resolveWithFullResponse : true,
+					qs: qs,
+					qsStringifyOptions: { indices: false },
+					headers: {
+							'X-Riot-Token': that.config.key
+					},
+					json: true // Automatically parses the JSON string in the response
+			};
+	
+			req(options)
+			.then(res => {
+				// TODO: adjust method limits
+				return queueItem.callback(res.body);
+			})
+			.catch(err => {
+				// TODO: adjust method limits
+				switch (err.statusCode) {
+					case 404: 
+						return queueItem.callback(null);
+					case 429:
+						console.error(err.response.headers);
+						return queueItem.onError(err.message); 
+						// TODO: limit exceeded backoff
+					case 500:
+						// TODO: internal server error riot, retry
+					case 503:
+						// TODO: service unavailable, retry
+					default: return queueItem.onError(err.message); 
+				}
 			});
 		}
-
-		// Create app limit and method limit attempt promise
-		let attemptPromises = [];
-		let appTimeLeft = 0;
-		attemptPromises.push(
-			that._getAttemptPromise(that.appLimiter)
-			.then(time => appTimeLeft = time)
-		);
-		let methodTimeLeft = 0;
-		attemptPromises.push(
-			that._getAttemptPromise(that.methodLimiters[target])
-			.then(time => methodTimeLeft = time)
-		);
-
-		await Promise.all(attemptPromises);
-
-		let timeLeft = appTimeLeft > methodTimeLeft ? appTimeLeft : methodTimeLeft;
-
-		if(timeLeft > 0)
-			await snooze(timeLeft);
-
-		var options = {
-		    uri: url,
-		    method: 'GET',
-		    resolveWithFullResponse : true,
-		    qs: qs,
-		    headers: {
-		        'X-Riot-Token': that.config.key
-		    },
-		    json: true // Automatically parses the JSON string in the response
-		};
-
-		req(options)
-		.then(res => {
-			console.log('response', res);
-			queueItem.callback(res);
-		})
-		.catch(err => {
-			console.error(err);
-			queueItem.onError(err);
-		})
+		if(that.requestQueue.length <= 0) {
+			that.isProcessing = false;
+			console.log("Resetting")
+		}
 	}
 
-	if(that.requestQueue.length <= 0)
-		that.isProcessing = false;
 }
 
 Region.prototype._getLimits = function(limitString) {

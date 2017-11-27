@@ -1,6 +1,8 @@
 {
 	"prefix": "https://%s.api.riotgames.com",
-	"applimit" : "20:1",
+	"applimit" : ["20:1","100:120"],
+	"spreadToSlowest": false,
+	"edgeCaseBuffer": 1.33,
 	"endpoints": {
 		"championMastery": {
 			"getAllChampionMasteries": {
