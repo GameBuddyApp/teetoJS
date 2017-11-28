@@ -29,7 +29,7 @@ RiotApi.prototype.get = function () {
 
 /** RateLimits for a region. One app limit and any number of method limits. */
 function Region(config, redisClient) {
-	if(this.config.debug) console.log("New region");
+	if(config.debug) console.log("New region");
 	this.config = config;
 	this.appLimiters = [];
 	this.methodLimits = {};
