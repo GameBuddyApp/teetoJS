@@ -12,12 +12,11 @@ const PRIORITIES = {
 };
 
 /** `RiotApi(key [, config])` or `RiotApi(config)` with `config.key` set. */
-function RiotApi(apiKey, redisConfig = null, config = defaultConfig) {
+function RiotApi(apiKey, config) {
 	if (!(this instanceof RiotApi)) return new RiotApi(...arguments);
-	this.config = config;
+	this.config = Object.assign({}, defaultConfig, config);
 	this.config.key = apiKey;
 	this.regions = {};
-	if (redisConfig != null) this.config.redis = redisConfig; // TODO: Validate config before usage
 	this.redisClient = redis.createClient(this.config.redis);
 }
 
@@ -39,7 +38,7 @@ function Region(config, redisClient) {
 	this.appLimiters.push(
 		limiter({
 			redis: this.redisClient,
-			namespace: process.env.NODE_ENV + 'app_0', // TODO maybe settable by user
+			namespace: process.env.NODE_ENV + 'app_0',
 			interval: appLimit_1.interval,
 			maxInInterval: appLimit_1.maxRequests,
 			minDifference: Math.ceil(appLimit_1.interval / appLimit_1.maxRequests * this.config.edgeCaseFixValue)
@@ -50,7 +49,7 @@ function Region(config, redisClient) {
 	this.appLimiters.push(
 		limiter({
 			redis: this.redisClient,
-			namespace: process.env.NODE_ENV + 'app_1', // TODO maybe settable by user
+			namespace: process.env.NODE_ENV + 'app_1',
 			interval: appLimit_2.interval,
 			maxInInterval: appLimit_2.maxRequests,
 			minDifference: minDiff
@@ -265,7 +264,7 @@ Region.prototype.createMethodLimiter = function (endpointLimit, target, forceNew
 					limit: limit,
 					limiter: limiter({
 						redis: this.redisClient,
-						namespace: process.env.NODE_ENV + target, // TODO maybe settable by user
+						namespace: process.env.NODE_ENV + target,
 						interval: methodlimit.interval,
 						maxInInterval: methodlimit.maxRequests
 					})
