@@ -29,7 +29,7 @@ RiotApi.prototype.get = function () {
 
 /** RateLimits for a region. One app limit and any number of method limits. */
 function Region(config, redisClient) {
-	console.log("New region");
+	if(this.config.debug) console.log("New region");
 	this.config = config;
 	this.appLimiters = [];
 	this.methodLimits = {};
@@ -102,7 +102,7 @@ Region.prototype.processQueue = async(that) => {
 		}
 		if (that.priorityRequestQueue.length <= 0 && that.requestQueue.length <= 0) {
 			that.isProcessing = false;
-			console.log("Resetting");
+			if(that.config.debug) console.log("Resetting");
 		}
 	}
 
@@ -116,7 +116,6 @@ Region.prototype._process = async(that, queue) => {
 	let target = queueItem.arguments[1];
 	let endpoint = that._getEndpoint(target);
 	if (endpoint === undefined) {
-		console.error("Api endpoint " + target + "not defined");
 		return queueItem.onError("Api endpoint " + target + " not defined");
 	}
 	let url = that._buildUrl(prefix, endpoint.url, queueItem.arguments);
@@ -143,7 +142,7 @@ Region.prototype._process = async(that, queue) => {
 	await Promise.all(attemptPromises);
 	let timeLeft = appTimeLeft > methodTimeLeft ? appTimeLeft : methodTimeLeft;
 	if (timeLeft > 0 || queueItem.retryMS > 0) {
-		console.log("Snoozing for", timeLeft + queueItem.retryMS);
+		if(that.config.debug) console.log("Snoozing for", timeLeft + queueItem.retryMS);
 		await snooze(timeLeft + queueItem.retryMS);
 	}
 
@@ -171,7 +170,6 @@ Region.prototype._sendRequest = function (url, qs, target, queueItem) {
 		return queueItem.callback(res.body);
 	})
 	.catch(err => {
-		console.log(err.statusCode);
 		this._adjustMethodLimit(target, err.response.headers);
 		switch (err.statusCode) {
 			case 404:
@@ -256,7 +254,7 @@ Region.prototype.createMethodLimiter = function (endpointLimit, target, forceNew
 				let limit = endpointLimit;
 				if(!err && res != null) {
 					limit = res;
-					console.log("Got limit from redis", limit);
+					if(this.config.debug) console.log("Got limit from redis", limit);
 				}
 
 				let methodlimit = this._getLimits(limit);
@@ -269,7 +267,7 @@ Region.prototype.createMethodLimiter = function (endpointLimit, target, forceNew
 						maxInInterval: methodlimit.maxRequests
 					})
 				}
-				console.log("New method limiter");
+				if(this.config.debug) console.log("New method limiter");
 				return resolve();
 			});
 		} else return resolve();

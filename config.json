@@ -1,5 +1,6 @@
 {
 	"prefix": "https://%s.api.riotgames.com",
+	"debug": false,
 	"showWarn": true,
 	"applimit" : ["20:1","100:120"],
 	"spreadToSlowest": false,
