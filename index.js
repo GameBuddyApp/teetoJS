@@ -33,7 +33,7 @@ function Region(config, redisClient) {
 	console.log("New region");
 	this.config = config;
 	this.appLimiters = [];
-	this.methodLimiters = {};
+	this.methodLimits = {};
 	this.redisClient = redisClient;
 	let appLimit_1 = this._getLimits(this.config.applimit[0]);
 	this.appLimiters.push(
@@ -42,11 +42,11 @@ function Region(config, redisClient) {
 			namespace: process.env.NODE_ENV + 'app_0', // TODO maybe settable by user
 			interval: appLimit_1.interval,
 			maxInInterval: appLimit_1.maxRequests,
-			minDifference: Math.ceil(appLimit_1.interval / appLimit_1.maxRequests * this.config.edgeCaseBuffer)
+			minDifference: Math.ceil(appLimit_1.interval / appLimit_1.maxRequests * this.config.edgeCaseFixValue)
 		})
 	);
 	let appLimit_2 = this._getLimits(this.config.applimit[1]);
-	let minDiff = this.config.spreadToSlowest ? Math.ceil(appLimit_2.interval / appLimit_2.maxRequests * this.config.edgeCaseBuffer) : 0;
+	let minDiff = this.config.spreadToSlowest ? Math.ceil(appLimit_2.interval / appLimit_2.maxRequests * this.config.edgeCaseFixValue) : 0;
 	this.appLimiters.push(
 		limiter({
 			redis: this.redisClient,
@@ -68,15 +68,15 @@ Region.prototype.get = function () {
 
 		let queueToPush;
 		if (priority === PRIORITIES.HIGH) {
-			console.log("Add to priority");
 			queueToPush = this.priorityRequestQueue;
 		} else {
-			console.log("Add to normal");
 			queueToPush = this.requestQueue;
 		}
 
 		queueToPush.push({
 			arguments: arguments,
+			retryCount: 0,
+			retryMS: 0,
 			callback: res => {
 				return resolve(res);
 			},
@@ -95,17 +95,15 @@ Region.prototype.processQueue = async(that) => {
 		that.isProcessing = true;
 		while (that.priorityRequestQueue.length > 0 || that.requestQueue.length > 0) {
 			while(that.priorityRequestQueue.length > 0) {
-				console.log("Process priority");
 				await that._process(that, that.priorityRequestQueue);
 			}
 			if(that.requestQueue.length > 0) {
-				console.log("Process normal");
 				await that._process(that, that.requestQueue);
 			}
 		}
 		if (that.priorityRequestQueue.length <= 0 && that.requestQueue.length <= 0) {
 			that.isProcessing = false;
-			console.log("Resetting")
+			console.log("Resetting");
 		}
 	}
 
@@ -125,7 +123,7 @@ Region.prototype._process = async(that, queue) => {
 	let url = that._buildUrl(prefix, endpoint.url, queueItem.arguments);
 
 	// Create methodlimiter, if not already created
-	that.createMethodLimiter(endpoint.limit, target);
+	await that.createMethodLimiter(endpoint.limit, target);
 
 	// Create app limit and method limit attempt promise
 	let attemptPromises = [];
@@ -140,21 +138,21 @@ Region.prototype._process = async(that, queue) => {
 	});
 	let methodTimeLeft = 0;
 	attemptPromises.push(
-		that._getAttemptPromise(that.methodLimiters[target])
+		that._getAttemptPromise(that.methodLimits[target].limiter)
 			.then(time => methodTimeLeft = time)
 	);
 	await Promise.all(attemptPromises);
 	let timeLeft = appTimeLeft > methodTimeLeft ? appTimeLeft : methodTimeLeft;
-	if (timeLeft > 0) {
-		console.log("Snoozing for", timeLeft);
-		await snooze(timeLeft);
+	if (timeLeft > 0 || queueItem.retryMS > 0) {
+		console.log("Snoozing for", timeLeft + queueItem.retryMS);
+		await snooze(timeLeft + queueItem.retryMS);
 	}
 
 	// send request to riot
-	return that._sendRequest(url.url, url.qs, queueItem);
+	return that._sendRequest(url.url, url.qs, target, queueItem);
 }
 
-Region.prototype._sendRequest = function (url, qs, queueItem) {
+Region.prototype._sendRequest = function (url, qs, target, queueItem) {
 	
 	var options = {
 		uri: url,
@@ -170,25 +168,63 @@ Region.prototype._sendRequest = function (url, qs, queueItem) {
 
 	req(options)
 	.then(res => {
-		// TODO: adjust method limits
+		this._adjustMethodLimit(target, res.headers);
 		return queueItem.callback(res.body);
 	})
 	.catch(err => {
-		// TODO: adjust method limits
+		console.log(err.statusCode);
+		this._adjustMethodLimit(target, err.response.headers);
 		switch (err.statusCode) {
 			case 404:
 				return queueItem.callback(null);
 			case 429:
-				console.error(err.response.headers);
-				return queueItem.onError(err.message);
-			// TODO: limit exceeded backoff
-			case 500:
-			// TODO: internal server error riot, retry
-			case 503:
-			// TODO: service unavailable, retry
+				if(this.config.showWarn) console.error("429 - Rate limit exceeded", err.response.headers);
+				if(queueItem.retryCount < this.config.maxRetriesAmnt) {
+					// if retry-after is given take that as time, else take default value from config
+					let retryMS = err.response.headers['retry-after'] != null ? parseInt(err.response.headers['retry-after'])*1000 : null;
+					queueItem.arguments[2] = PRIORITIES.HIGH; // set priority to high so we dont cause more 429 errors
+					return this._retryRequest(queueItem, retryMS);
+				} else {
+					return queueItem.onError("429 - Aborting request after retrying " + queueItem.retryCount + " times", {
+						msg: err.message,
+						url: url
+					});
+				}
+			case 500: // fall through to 503				
+			case 503: 
+				// internal server error or service unavailable at riot, retry
+				if(queueItem.retryCount < this.config.maxRetriesAmnt) {
+					this._retryRequest(queueItem);
+				} else {
+					return queueItem.onError("Aborting request after retrying " + queueItem.retryCount + " times", {
+						msg: err.message,
+						url: url
+					});
+				}
 			default: return queueItem.onError(err.message);
 		}
 	});
+}
+
+Region.prototype._adjustMethodLimit = function(target, headers) {
+	let methodLimit = headers['x-method-rate-limit'];
+	if(methodLimit != null && methodLimit !== this.methodLimits[target].limit) {
+		this.createMethodLimiter(methodLimit, target, true);
+	}
+	// save in redis
+	this.redisClient.set(process.env.NODE_ENV + target + "_limit", methodLimit);
+}
+
+Region.prototype._retryRequest = function(item, retryMS = null) {
+	item.retryCount++;
+	if(retryMS !== null) item.retryMS = retryMS;
+	else item.retryMS = item.retryMS == 0 ? this.config.retryMS : item.retryMS * 2;
+	let priority = item.arguments[2];
+	if(priority === PRIORITIES.HIGH) this.priorityRequestQueue.unshift(item);
+	else this.requestQueue.unshift(item);
+
+	// tell queue to run if not running already
+	this.processQueue(this);
 }
 
 Region.prototype._getEndpoint = function (target) {
@@ -213,17 +249,32 @@ Region.prototype._buildUrl = function (prefix, suffix) {
 	};
 }
 
-Region.prototype.createMethodLimiter = function (limit, target) {
-	if (this.methodLimiters[target] === undefined) {
-		let methodlimit = this._getLimits(limit);
-		this.methodLimiters[target] = limiter({
-			redis: this.redisClient,
-			namespace: process.env.NODE_ENV + target, // TODO maybe settable by user
-			interval: methodlimit.interval,
-			maxInInterval: methodlimit.maxRequests
-		});
-		console.log("New method limiter");
-	}
+Region.prototype.createMethodLimiter = function (endpointLimit, target, forceNew = false) {
+	return new Promise((resolve, reject) => {
+		if (this.methodLimits[target] === undefined || forceNew) {
+			// get limit from redis, if not available take limit from config
+			this.redisClient.get(process.env.NODE_ENV + target + "_limit", (err, res) => {
+				let limit = endpointLimit;
+				if(!err && res != null) {
+					limit = res;
+					console.log("Got limit from redis", limit);
+				}
+
+				let methodlimit = this._getLimits(limit);
+				this.methodLimits[target] = {
+					limit: limit,
+					limiter: limiter({
+						redis: this.redisClient,
+						namespace: process.env.NODE_ENV + target, // TODO maybe settable by user
+						interval: methodlimit.interval,
+						maxInInterval: methodlimit.maxRequests
+					})
+				}
+				console.log("New method limiter");
+				return resolve();
+			});
+		} else return resolve();
+	});
 }
 
 Region.prototype._getLimits = function (limitString) {
@@ -249,5 +300,5 @@ Region.prototype._getAttemptPromise = function (explicitLimiter) {
 		});
 	});
 }
-
 const snooze = ms => new Promise(resolve => setTimeout(resolve, ms));
+module.exports = RiotApi;
