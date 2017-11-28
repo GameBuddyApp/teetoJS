@@ -170,7 +170,7 @@ Region.prototype._sendRequest = function (url, qs, target, queueItem) {
 		return queueItem.callback(res.body);
 	})
 	.catch(err => {
-		this._adjustMethodLimit(target, err.response.headers);
+		if(err.response) this._adjustMethodLimit(target, err.response.headers);
 		switch (err.statusCode) {
 			case 404:
 				return queueItem.callback(null);
@@ -207,9 +207,9 @@ Region.prototype._adjustMethodLimit = function(target, headers) {
 	let methodLimit = headers['x-method-rate-limit'];
 	if(methodLimit != null && methodLimit !== this.methodLimits[target].limit) {
 		this.createMethodLimiter(methodLimit, target, true);
+		// save in redis
+		this.redisClient.set(process.env.NODE_ENV + target + "_limit", methodLimit);
 	}
-	// save in redis
-	this.redisClient.set(process.env.NODE_ENV + target + "_limit", methodLimit);
 }
 
 Region.prototype._retryRequest = function(item, retryMS = null) {
