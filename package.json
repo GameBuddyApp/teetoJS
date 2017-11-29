@@ -1,6 +1,6 @@
 {
   "name": "teetojs",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Node.js Riot API Wrapper with integrated Redis rate limiter",
   "main": "index.js",
   "scripts": {
@@ -27,6 +27,8 @@
   "dependencies": {
     "redis": "^2.8.0",
     "request": "^2.83.0",
-    "request-promise": "^4.2.2"
+    "request-promise": "^4.2.2",
+    "microtime-nodejs": "~1.0.0",
+    "uuid": "^3.0.1"
   }
 }
