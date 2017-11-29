@@ -3,7 +3,7 @@
 const util = require("util");
 const req = require("request-promise");
 const defaultConfig = require("./config.json");
-const limiter = require("rolling-rate-limiter");
+const limiter = require("./lib/rolling-rate-limiter");
 const redis = require("redis");
 
 const PRIORITIES = {
@@ -175,7 +175,10 @@ Region.prototype._sendRequest = function (url, qs, target, queueItem) {
 			case 404:
 				return queueItem.callback(null);
 			case 429:
-				if(this.config.showWarn) console.error("429 - Rate limit exceeded", err.response.headers);
+				if(this.config.showWarn) console.error("429 - Rate limit exceeded", {
+					headers: err.response.headers,
+					url: url
+				});
 				if(queueItem.retryCount < this.config.maxRetriesAmnt) {
 					// if retry-after is given take that as time, else take default value from config
 					let retryMS = err.response.headers['retry-after'] != null ? parseInt(err.response.headers['retry-after'])*1000 : null;
@@ -191,7 +194,7 @@ Region.prototype._sendRequest = function (url, qs, target, queueItem) {
 			case 503: 
 				// internal server error or service unavailable at riot, retry
 				if(queueItem.retryCount < this.config.maxRetriesAmnt) {
-					this._retryRequest(queueItem);
+					return this._retryRequest(queueItem);
 				} else {
 					return queueItem.onError("Aborting request after retrying " + queueItem.retryCount + " times", {
 						msg: err.message,
@@ -264,10 +267,11 @@ Region.prototype.createMethodLimiter = function (endpointLimit, target, forceNew
 						redis: this.redisClient,
 						namespace: process.env.NODE_ENV + target,
 						interval: methodlimit.interval,
-						maxInInterval: methodlimit.maxRequests
+						maxInInterval: methodlimit.maxRequests,
+						minDifference: Math.ceil(methodlimit.interval / methodlimit.maxRequests * this.config.edgeCaseFixValue)
 					})
 				}
-				if(this.config.debug) console.log("New method limiter");
+				if(this.config.debug) console.log("New method limiter for " + target);
 				return resolve();
 			});
 		} else return resolve();

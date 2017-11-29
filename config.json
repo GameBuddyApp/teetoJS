@@ -4,7 +4,7 @@
 	"showWarn": true,
 	"applimit" : ["20:1","100:120"],
 	"spreadToSlowest": false,
-	"edgeCaseFixValue": 1.33,
+	"edgeCaseFixValue": 1.1,
 	"maxRetriesAmnt": 3,
 	"retryMS": 1000,
 	"endpoints": {

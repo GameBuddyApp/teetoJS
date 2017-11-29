@@ -56,8 +56,4 @@ You should at least give your valid redis config to make the wrapper work.
 
 ### Rate-Limiting ###
 
-To rate limit all your requests accross multiple instances, this wrapper is using the [`rolling-rate-limiter`](https://github.com/classdojo/rolling-rate-limiter) from classdojo.
-
-### Credits ###
-
-A lot of this wrapper is based on [`TeemoJS`](https://github.com/MingweiSamuel/TeemoJS) from MingweiSamuel
+To rate limit all your requests accross multiple instances, this wrapper is using a modified version of the [`rolling-rate-limiter`](https://github.com/classdojo/rolling-rate-limiter) from classdojo.
