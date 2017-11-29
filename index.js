@@ -22,15 +22,16 @@ function RiotApi(apiKey, config) {
 
 RiotApi.prototype.get = function () {
 	if (this.regions[arguments[0]] === undefined)
-		this.regions[arguments[0]] = new Region(this.config, this.redisClient);
+		this.regions[arguments[0]] = new Region(this.config, this.redisClient, arguments[0]);
 
 	return this.regions[arguments[0]].get(...arguments);
 };
 
 /** RateLimits for a region. One app limit and any number of method limits. */
-function Region(config, redisClient) {
+function Region(config, redisClient, platformId) {
 	if(config.debug) console.log("New region");
 	this.config = config;
+	this.platformId = platformId;
 	this.appLimiters = [];
 	this.methodLimits = {};
 	this.redisClient = redisClient;
@@ -211,7 +212,7 @@ Region.prototype._adjustMethodLimit = function(target, headers) {
 	if(methodLimit != null && methodLimit !== this.methodLimits[target].limit) {
 		this.createMethodLimiter(methodLimit, target, true);
 		// save in redis
-		this.redisClient.set(process.env.NODE_ENV + target + "_limit", methodLimit);
+		this.redisClient.set(process.env.NODE_ENV + this.platformId + target + "_limit", methodLimit);
 	}
 }
 
@@ -253,7 +254,7 @@ Region.prototype.createMethodLimiter = function (endpointLimit, target, forceNew
 	return new Promise((resolve, reject) => {
 		if (this.methodLimits[target] === undefined || forceNew) {
 			// get limit from redis, if not available take limit from config
-			this.redisClient.get(process.env.NODE_ENV + target + "_limit", (err, res) => {
+			this.redisClient.get(process.env.NODE_ENV + this.platformId + target + "_limit", (err, res) => {
 				let limit = endpointLimit;
 				if(!err && res != null) {
 					limit = res;
