@@ -18,7 +18,7 @@ let api = TeetoJS('RGAPI-KEY-HERE', {
         host: 'YOUR-HOSTNAME',
         port: 6379, // or whatever port you have
         db: 1,
-        password: 'YOUR-PORT'
+        password: 'YOUR-PASSWORD'
     }
 });
 
