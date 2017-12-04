@@ -187,6 +187,7 @@ Region.prototype._sendRequest = function (url, qs, target, queueItem) {
 					return this._retryRequest(queueItem, retryMS);
 				} else {
 					return queueItem.onError("429 - Aborting request after retrying " + queueItem.retryCount + " times", {
+						statusCode: err.statusCode,
 						msg: err.message,
 						url: url
 					});
@@ -198,11 +199,15 @@ Region.prototype._sendRequest = function (url, qs, target, queueItem) {
 					return this._retryRequest(queueItem);
 				} else {
 					return queueItem.onError("Aborting request after retrying " + queueItem.retryCount + " times", {
+						statusCode: err.statusCode,
 						msg: err.message,
 						url: url
 					});
 				}
-			default: return queueItem.onError(err.message);
+			default: return queueItem.onError({
+				statusCode: err.statusCode,
+				msg: err.message
+			});
 		}
 	});
 }
