@@ -22,6 +22,10 @@ let api = TeetoJS('RGAPI-KEY-HERE', {
     }
 });
 
+api.get('euw', 'summoner.getBySummonerName', encodeURIComponent("TheCraccer"))
+.then(res => console.log(res))
+.catch(err => console.log(err));
+
 api.get('na1', 'match.getMatchlist', 0, 78247)
 .then(res => console.log(res))
 .catch(err => console.log(err));
@@ -35,6 +39,7 @@ All requests are done via `.get(...)`.
 - Then come any path arguments (usually zero or one, or two for `getChampionMastery`) which are for
 summoner/match IDs, names, etc.
 - Last is an optional object for any query parameters.
+(Important: You should encode names when searching for summoners, because some characters need to be encoded to be found from riot)
 
 ## Configuration
 
