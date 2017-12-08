@@ -2,6 +2,7 @@
 	"prefix": "https://%s.api.riotgames.com",
 	"debug": false,
 	"showWarn": true,
+	"exceededCallback": null,
 	"applimit" : ["20:1","100:120"],
 	"spreadToSlowest": false,
 	"edgeCaseFixValue": 1.1,
@@ -180,6 +181,12 @@
 			"getBySummonerId": {
 				"url": "/lol/summoner/v3/summoners/%s",
 				"limit": "600:10"
+			}
+		},
+		"thirdParty": {
+			"getBySummonerId": {				
+				"url": "/lol/platform/v3/third-party-code/by-summoner/%s",
+				"limit": "20000:10"
 			}
 		}
 	},

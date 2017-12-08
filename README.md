@@ -53,6 +53,7 @@ You should at least give your valid redis config to make the wrapper work.
 
 - `debug` [boolean]: Weather to show debug outputs or not
 - `showWarn` [boolean]: Weather to console.error occuring 429 errors or not
+- `exceededCallback` [func(err)]: Callback to be called if a 429 error appeared. Parameter is an error object containing `headers` and `url`
 - `applimit` [array]: Your apiKey application limits, e.g. ["20:1","100:120"]
 - `spreadToSlowest` [boolean]: All requests are spreaded according to your slowest limit. Set this value to `false` to only respect your smaller limits (e.g. your 10s limit). Recommendation: Use `true` for production
 - `edgeCaseFixValue` [number]: Since Riot resets it's limits by their own time there is a small [`edge case`](https://imgur.com/a/whIAu) where requests are resetted in the wrapper but not at riot. This value slows down your requests, so that this does not happen to often. A value of `1.1` means that you are running at 90% speed. WARNING: Setting this value very low might cause 429-errors.

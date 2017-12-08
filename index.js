@@ -180,6 +180,10 @@ Region.prototype._sendRequest = function (url, qs, target, queueItem) {
 					headers: err.response.headers,
 					url: url
 				});
+				if(this.options.exceededCallback != null) this.options.exceededCallback({
+					headers: err.response.headers,
+					url: url
+				});
 				if(queueItem.retryCount < this.config.maxRetriesAmnt) {
 					// if retry-after is given take that as time, else take default value from config
 					let retryMS = err.response.headers['retry-after'] != null ? parseInt(err.response.headers['retry-after'])*1000 : null;
@@ -271,7 +275,7 @@ Region.prototype.createMethodLimiter = function (endpointLimit, target, forceNew
 					limit: limit,
 					limiter: limiter({
 						redis: this.redisClient,
-						namespace: process.env.NODE_ENV + target,
+						namespace: process.env.NODE_ENV + this.platformId + target,
 						interval: methodlimit.interval,
 						maxInInterval: methodlimit.maxRequests,
 						minDifference: Math.ceil(methodlimit.interval / methodlimit.maxRequests * this.config.edgeCaseFixValue)
