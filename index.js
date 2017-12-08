@@ -180,7 +180,7 @@ Region.prototype._sendRequest = function (url, qs, target, queueItem) {
 					headers: err.response.headers,
 					url: url
 				});
-				if(this.options.exceededCallback != null) this.options.exceededCallback({
+				if(this.config.exceededCallback != null) this.config.exceededCallback({
 					headers: err.response.headers,
 					url: url
 				});
