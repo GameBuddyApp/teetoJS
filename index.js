@@ -190,9 +190,9 @@ Region.prototype._sendRequest = function (url, qs, target, queueItem) {
 					queueItem.arguments[2] = PRIORITIES.HIGH; // set priority to high so we dont cause more 429 errors
 					return this._retryRequest(queueItem, retryMS);
 				} else {
-					return queueItem.onError("429 - Aborting request after retrying " + queueItem.retryCount + " times", {
+					return queueItem.onError({
 						statusCode: err.statusCode,
-						msg: err.message,
+						msg: "429 - Aborting request after retrying " + queueItem.retryCount + " times. Error message: " + err.message,
 						url: url
 					});
 				}
@@ -202,9 +202,9 @@ Region.prototype._sendRequest = function (url, qs, target, queueItem) {
 				if(queueItem.retryCount < this.config.maxRetriesAmnt) {
 					return this._retryRequest(queueItem);
 				} else {
-					return queueItem.onError("Aborting request after retrying " + queueItem.retryCount + " times", {
+					return queueItem.onError({
 						statusCode: err.statusCode,
-						msg: err.message,
+						msg: "Aborting request after retrying " + queueItem.retryCount + " times. Error message: " + err.message,
 						url: url
 					});
 				}
