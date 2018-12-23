@@ -11,15 +11,15 @@
 	"endpoints": {
 		"championMastery": {
 			"getAllChampionMasteries": {
-				"url": "/lol/champion-mastery/v3/champion-masteries/by-summoner/%s",
+				"url": "/lol/champion-mastery/v4/champion-masteries/by-summoner/%s",
 				"limit": "20000:10"
 			},
 			"getChampionMastery": {
-				"url": "/lol/champion-mastery/v3/champion-masteries/by-summoner/%s/by-champion/%s",
+				"url": "/lol/champion-mastery/v4/champion-masteries/by-summoner/%s/by-champion/%s",
 				"limit": "20000:10"
 			},
 			"getChampionMasteryScore": {
-				"url": "/lol/champion-mastery/v3/scores/by-summoner/%s",
+				"url": "/lol/champion-mastery/v4/scores/by-summoner/%s",
 				"limit": "20000:10"
 			}
 		},
@@ -35,23 +35,23 @@
 		},
 		"league": {
 			"getChallengerLeague": {
-				"url": "/lol/league/v3/challengerleagues/by-queue/%s",
+				"url": "/lol/league/v4/challengerleagues/by-queue/%s",
 				"limit": "35:60"
 			},
 			"getAllLeaguesForSummoner": {
-				"url": "/lol/league/v3/leagues/by-summoner/%s",
+				"url": "/lol/league/v4/leagues/by-summoner/%s",
 				"limit": "35:60"
 			},
 			"getLeagueById": {
-				"url": "/lol/league/v3/leagues/%s",
+				"url": "/lol/league/v4/leagues/%s",
 				"limit": "35:60"
 			},
 			"getMasterLeague": {
-				"url": "/lol/league/v3/masterleagues/by-queue/%s",
+				"url": "/lol/league/v4/grandmasterleagues/by-queue/%s",
 				"limit": "35:60"
 			},
 			"getAllLeaguePositionsForSummoner": {
-				"url": "/lol/league/v3/positions/by-summoner/%s",
+				"url": "/lol/league/v4/positions/by-summoner/%s",
 				"limit": "35:60"
 			}
 		},
@@ -63,63 +63,57 @@
 		},
 		"match": {
 			"getMatchIdsByTournamentCode": {
-				"url": "/lol/match/v3/matches/by-tournament-code/%s/ids",
+				"url": "/lol/match/v4/matches/by-tournament-code/%s/ids",
 				"limit": "20000:10"
 			},
 			"getMatch": {
-				"url": "/lol/match/v3/matches/%s",
+				"url": "/lol/match/v4/matches/%s",
 				"limit": "500:10"
 			},
 			"getMatchByTournamentCode": {
-				"url": "/lol/match/v3/matches/%s/by-tournament-code/%s",
+				"url": "/lol/match/v4/matches/%s/by-tournament-code/%s",
 				"limit": "20000:10"
 			},
 			"getMatchlist": {
-				"url": "/lol/match/v3/matchlists/by-account/%s",
-				"limit": "1000:10"
-			},
-			"getRecentMatchlist": {
-				"url": "/lol/match/v3/matchlists/by-account/%s/recent",
+				"url": "/lol/match/v4/matchlists/by-account/%s",
 				"limit": "1000:10"
 			},
 			"getMatchTimeline": {
-				"url": "/lol/match/v3/timelines/by-match/%s",
+				"url": "/lol/match/v4/timelines/by-match/%s",
 				"limit": "500:10"
-			}
-		},
-		"runes": {
-			"getRunePagesBySummonerId": {
-				"url": "/lol/platform/v3/runes/by-summoner/%s",
-				"limit": "400:60"
 			}
 		},
 		"spectator": {
 			"getCurrentGameInfoBySummoner": {
-				"url": "/lol/spectator/v3/active-games/by-summoner/%s",
+				"url": "/lol/spectator/v4/active-games/by-summoner/%s",
 				"limit": "20000:10"
 			},
 			"getFeaturedGames": {
-				"url": "/lol/spectator/v3/featured-games",
+				"url": "/lol/spectator/v4/featured-games",
 				"limit": "20000:10"
 			}
 		},
 		"summoner": {
 			"getByAccountId": {
-				"url": "/lol/summoner/v3/summoners/by-account/%s",
+				"url": "/lol/summoner/v4/summoners/by-account/%s",
 				"limit": "1000:10"
 			},
 			"getBySummonerName": {
-				"url": "/lol/summoner/v3/summoners/by-name/%s",
+				"url": "/lol/summoner/v4/summoners/by-name/%s",
+				"limit": "600:10"
+			},
+			"getByPuuid": {
+				"url": "/lol/summoner/v4/summoners/by-puuid/%s",
 				"limit": "600:10"
 			},
 			"getBySummonerId": {
-				"url": "/lol/summoner/v3/summoners/%s",
+				"url": "/lol/summoner/v4/summoners/%s",
 				"limit": "600:10"
 			}
 		},
 		"thirdParty": {
 			"getBySummonerId": {				
-				"url": "/lol/platform/v3/third-party-code/by-summoner/%s",
+				"url": "/lol/platform/v4/third-party-code/by-summoner/%s",
 				"limit": "20000:10"
 			}
 		}
