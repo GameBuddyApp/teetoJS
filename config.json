@@ -39,7 +39,7 @@
 				"limit": "35:60"
 			},
 			"getAllLeaguesForSummoner": {
-				"url": "/lol/league/v4/leagues/by-summoner/%s",
+				"url": "/lol/league/v4/entries/by-summoner/%s",
 				"limit": "35:60"
 			},
 			"getLeagueById": {
@@ -51,7 +51,7 @@
 				"limit": "35:60"
 			},
 			"getAllLeaguePositionsForSummoner": {
-				"url": "/lol/league/v4/positions/by-summoner/%s",
+				"url": "/lol/league/v4/entries/by-summoner/%s",
 				"limit": "35:60"
 			}
 		},
