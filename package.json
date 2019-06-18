@@ -1,6 +1,6 @@
 {
   "name": "teetojs",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "description": "Node.js Riot API Wrapper with integrated Redis rate limiter",
   "main": "index.js",
   "scripts": {
