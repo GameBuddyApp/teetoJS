@@ -39,7 +39,7 @@ function Region(config, redisClient, platformId) {
 	this.appLimiters.push(
 		limiter({
 			redis: this.redisClient,
-			namespace: process.env.NODE_ENV + 'app_0',
+			namespace: process.env.NODE_ENV + this.config.namespacePrefix + 'app_0',
 			interval: appLimit_1.interval,
 			maxInInterval: appLimit_1.maxRequests,
 			minDifference: Math.ceil(appLimit_1.interval / appLimit_1.maxRequests * this.config.edgeCaseFixValue)
@@ -50,7 +50,7 @@ function Region(config, redisClient, platformId) {
 	this.appLimiters.push(
 		limiter({
 			redis: this.redisClient,
-			namespace: process.env.NODE_ENV + 'app_1',
+			namespace: process.env.NODE_ENV + this.config.namespacePrefix + 'app_1',
 			interval: appLimit_2.interval,
 			maxInInterval: appLimit_2.maxRequests,
 			minDifference: minDiff
@@ -221,7 +221,7 @@ Region.prototype._adjustMethodLimit = function(target, headers) {
 	if(methodLimit != null && methodLimit !== this.methodLimits[target].limit) {
 		this.createMethodLimiter(methodLimit, target, true);
 		// save in redis
-		this.redisClient.set(process.env.NODE_ENV + this.platformId + target + "_limit", methodLimit);
+		this.redisClient.set(process.env.NODE_ENV + this.config.namespacePrefix + this.platformId + target + "_limit", methodLimit);
 	}
 }
 
@@ -263,7 +263,7 @@ Region.prototype.createMethodLimiter = function (endpointLimit, target, forceNew
 	return new Promise((resolve, reject) => {
 		if (this.methodLimits[target] === undefined || forceNew) {
 			// get limit from redis, if not available take limit from config
-			this.redisClient.get(process.env.NODE_ENV + this.platformId + target + "_limit", (err, res) => {
+			this.redisClient.get(process.env.NODE_ENV + this.config.namespacePrefix + this.platformId + target + "_limit", (err, res) => {
 				let limit = endpointLimit;
 				if(!err && res != null) {
 					limit = res;
@@ -275,7 +275,7 @@ Region.prototype.createMethodLimiter = function (endpointLimit, target, forceNew
 					limit: limit,
 					limiter: limiter({
 						redis: this.redisClient,
-						namespace: process.env.NODE_ENV + this.platformId + target,
+						namespace: process.env.NODE_ENV + this.config.namespacePrefix + this.platformId + target,
 						interval: methodlimit.interval,
 						maxInInterval: methodlimit.maxRequests,
 						minDifference: Math.ceil(methodlimit.interval / methodlimit.maxRequests * this.config.edgeCaseFixValue)
